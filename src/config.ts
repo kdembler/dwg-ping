@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+export const TEST_INTERVAL_MIN = process.env.TEST_INTERVAL_MIN ?? 5;
+
 export async function getEsClient() {
   if (!process.env.ELASTICSEARCH_URL) {
     console.error("ELASTICSEARCH_URL not set");

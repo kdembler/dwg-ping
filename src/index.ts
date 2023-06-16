@@ -6,7 +6,8 @@ import {
   DistributionOperatorStatus,
   OperatorAvailabilityResult,
 } from "./types.js";
-import { getEsClient } from "./config.js";
+import { TEST_INTERVAL_MIN, getEsClient } from "./config.js";
+import { CronJob } from "cron";
 
 const esClient = await getEsClient();
 if (!esClient) {
@@ -27,17 +28,22 @@ async function sendResults(results: OperatorAvailabilityResult[]) {
 }
 
 async function runTest() {
-  const operators = await getDistributionOperators();
-  const results = await Promise.all(
-    operators.map((operator) => getOperatorStatus(operator))
-  );
-  const resultsWithDegradations = await findOperatorDegradations(results);
+  console.log(`Running test at ${new Date()}`);
+  try {
+    const operators = await getDistributionOperators();
+    const results = await Promise.all(
+      operators.map((operator) => getOperatorStatus(operator))
+    );
+    const resultsWithDegradations = await findOperatorDegradations(results);
+    await sendResults(resultsWithDegradations);
 
-  await sendResults(resultsWithDegradations);
+    // console.log(JSON.stringify(resultsWithDegradations, null, 2));
 
-  // console.log(JSON.stringify(resultsWithDegradations, null, 2));
-
-  console.log("Sent the results to Elasticsearch");
+    console.log("Sent the results to Elasticsearch");
+  } catch (e) {
+    console.error("Test failed");
+    console.error(e);
+  }
 }
 
 async function getOperatorStatus(
@@ -157,4 +163,8 @@ async function getDistributionOpearatorStatus(
   }
 }
 
-await runTest();
+// start cron job to run the test every 5 minutes
+new CronJob(`0 */${TEST_INTERVAL_MIN} * * * *`, runTest, null, true);
+console.log(
+  `Started cron job to run the test every ${TEST_INTERVAL_MIN} minutes`
+);
