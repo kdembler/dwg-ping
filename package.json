@@ -1,0 +1,28 @@
+{
+  "name": "@joystream/operators-availability",
+  "version": "0.1.0",
+  "description": "Monitor Joystream Operators",
+  "license": "ISC",
+  "type": "module",
+  "scripts": {
+    "dev": "ts-node --esm src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.7.0",
+    "dotenv": "^16.0.3",
+    "graphql": "16.6.0",
+    "graphql-request": "^6.1.0",
+    "undici": "^5.22.1"
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^4.0.1",
+    "@graphql-codegen/client-preset": "^4.0.0",
+    "@graphql-typed-document-node/core": "^3.2.0",
+    "@tsconfig/recommended": "^1.0.2",
+    "@types/node": "^20.1.4",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  }
+}
