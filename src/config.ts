@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+export const GRAPHQL_URL = "https://query.joystream.org/graphql";
 export const TEST_INTERVAL_MIN = process.env.TEST_INTERVAL_MIN ?? 5;
 
 export async function getEsClient() {

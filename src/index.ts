@@ -6,7 +6,7 @@ import {
   DistributionOperatorStatus,
   OperatorAvailabilityResult,
 } from "./types.js";
-import { TEST_INTERVAL_MIN, getEsClient } from "./config.js";
+import { GRAPHQL_URL, TEST_INTERVAL_MIN, getEsClient } from "./config.js";
 import { CronJob } from "cron";
 
 const esClient = await getEsClient();
@@ -136,10 +136,7 @@ async function findOperatorDegradations(
 }
 
 async function getDistributionOperators() {
-  const data = await graphqlRequest(
-    "https://orion.joystream.org/graphql",
-    getOperatorsDataQueryDocument
-  );
+  const data = await graphqlRequest(GRAPHQL_URL, getOperatorsDataQueryDocument);
   return data.distributionBucketOperators;
 }
 
