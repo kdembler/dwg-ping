@@ -5,13 +5,27 @@ import { GetDistributorOperatorsQuery } from "./gql/graphql.js";
 import {
   DistributionOperatorStatus,
   OperatorAvailabilityResult,
+  SampleAssetTestResult,
 } from "./types.js";
 import { GRAPHQL_URL, TEST_INTERVAL_MIN, getEsClient } from "./config.js";
 import { CronJob } from "cron";
+import fs from "node:fs/promises";
+import { Client } from "@elastic/elasticsearch";
 
-const esClient = await getEsClient();
-if (!esClient) {
-  process.exit(1);
+const packageJson = JSON.parse(
+  await fs.readFile(new URL("../package.json", import.meta.url), "utf-8")
+);
+const packageVersion = packageJson.version;
+const userAgent = `dwg-ping/${packageVersion}`;
+const TEST_ASSET_ID = "1343";
+const REGULAR_RUN = true;
+
+let esClient: Client | null = null;
+if (REGULAR_RUN) {
+  esClient = await getEsClient();
+  if (!esClient) {
+    process.exit(1);
+  }
 }
 
 async function sendResults(results: OperatorAvailabilityResult[]) {
@@ -21,6 +35,7 @@ async function sendResults(results: OperatorAvailabilityResult[]) {
   ]);
   try {
     await esClient!.bulk({ body });
+    console.log("Sent the results to Elasticsearch");
   } catch (e) {
     console.error("Failed to send results to Elasticsearch");
     console.error(e);
@@ -35,11 +50,11 @@ async function runTest() {
       operators.map((operator) => getOperatorStatus(operator))
     );
     const resultsWithDegradations = await findOperatorDegradations(results);
-    await sendResults(resultsWithDegradations);
+    if (REGULAR_RUN) {
+      await sendResults(resultsWithDegradations);
+    }
 
-    // console.log(JSON.stringify(resultsWithDegradations, null, 2));
-
-    console.log("Sent the results to Elasticsearch");
+    console.log(JSON.stringify(resultsWithDegradations, null, 2));
   } catch (e) {
     console.error("Test failed");
     console.error(e);
@@ -49,31 +64,42 @@ async function runTest() {
 async function getOperatorStatus(
   operator: GetDistributorOperatorsQuery["distributionBucketOperators"][0]
 ): Promise<OperatorAvailabilityResult> {
+  const distributingStatus: OperatorAvailabilityResult["distributingStatus"] =
+    operator.distributionBucket.distributing
+      ? "distributing"
+      : "not-distributing";
   const commonFields = {
     time: new Date(),
     operatorId: operator.id,
     distributionBucketId: operator.distributionBucket.id,
     workerId: operator.workerId,
     nodeEndpoint: operator?.metadata?.nodeEndpoint ?? "",
+    distributingStatus,
   };
 
-  if (!operator.distributionBucket.distributing) {
-    return { ...commonFields, status: "not-distributing" };
-  }
-
   if (!operator?.metadata?.nodeEndpoint) {
-    return { ...commonFields, status: "dead", error: "No node endpoint" };
+    return { ...commonFields, pingStatus: "dead", error: "No node endpoint" };
   }
   const nodeStatus = await getDistributionOpearatorStatus(
     operator?.metadata?.nodeEndpoint
   );
   if (!nodeStatus) {
-    return { ...commonFields, status: "dead", error: "Failed to fetch status" };
+    return {
+      ...commonFields,
+      pingStatus: "dead",
+      error: "Failed to fetch status",
+    };
   }
+
+  const sampleAssetResult = await getSampleAssetFromDistributor(
+    operator?.metadata?.nodeEndpoint
+  );
 
   return {
     ...commonFields,
-    status: "ok",
+    pingStatus: sampleAssetResult.ok ? "ok" : "asset-download-failed",
+    assetDownloadStatusCode: sampleAssetResult.statusCode,
+    assetDownloadResponseTimeMs: sampleAssetResult.responseTimeMs,
     nodeStatus,
     opereatorMetadata: operator.metadata,
   };
@@ -90,7 +116,7 @@ async function findOperatorDegradations(
 
   const medianBlocksProcessed = getMedian(
     operatorsResults
-      .filter((result) => result.status === "ok")
+      .filter((result) => result.pingStatus === "ok")
       .map(
         (result) =>
           ((result as any).nodeStatus as DistributionOperatorStatus)
@@ -100,7 +126,7 @@ async function findOperatorDegradations(
 
   const medianChainHead = getMedian(
     operatorsResults
-      .filter((result) => result.status === "ok")
+      .filter((result) => result.pingStatus === "ok")
       .map(
         (result) =>
           ((result as any).nodeStatus as DistributionOperatorStatus)
@@ -109,7 +135,7 @@ async function findOperatorDegradations(
   );
 
   return operatorsResults.map((result) => {
-    if (result.status !== "ok") {
+    if (result.pingStatus !== "ok") {
       return result;
     }
     const qnStatus = result.nodeStatus.queryNodeStatus;
@@ -122,7 +148,7 @@ async function findOperatorDegradations(
     if (blocksProcessedDiff > THRESHOLD || chainHeadDiff > THRESHOLD) {
       return {
         ...result,
-        status: "degraded",
+        pingStatus: "degraded",
         refBlocksProcessed: medianBlocksProcessed,
         refChainHead: medianChainHead,
       };
@@ -136,7 +162,13 @@ async function findOperatorDegradations(
 }
 
 async function getDistributionOperators() {
-  const data = await graphqlRequest(GRAPHQL_URL, getOperatorsDataQueryDocument);
+  const data = await graphqlRequest({
+    document: getOperatorsDataQueryDocument,
+    url: GRAPHQL_URL,
+    requestHeaders: {
+      "User-Agent": userAgent,
+    },
+  });
   return data.distributionBucketOperators;
 }
 
@@ -144,7 +176,11 @@ async function getDistributionOpearatorStatus(
   nodeEndpoint: string
 ): Promise<DistributionOperatorStatus | null> {
   try {
-    const response = await fetch(`${nodeEndpoint}api/v1/status`);
+    const response = await fetch(`${nodeEndpoint}api/v1/status`, {
+      headers: {
+        "User-Agent": userAgent,
+      },
+    });
     if (response.status !== 200) {
       console.error(
         `Failed to fetch status from ${nodeEndpoint}, status code: ${response.status}`
@@ -160,8 +196,45 @@ async function getDistributionOpearatorStatus(
   }
 }
 
-// start cron job to run the test every 5 minutes
-new CronJob(`0 */${TEST_INTERVAL_MIN} * * * *`, runTest, null, true);
-console.log(
-  `Started cron job to run the test every ${TEST_INTERVAL_MIN} minutes`
-);
+async function getSampleAssetFromDistributor(
+  nodeEndpoint: string
+): Promise<SampleAssetTestResult> {
+  try {
+    const startTime = performance.now();
+    const response = await fetch(
+      `${nodeEndpoint}api/v1/assets/${TEST_ASSET_ID}`,
+      {
+        headers: {
+          "User-Agent": userAgent,
+        },
+      }
+    );
+    const endTime = performance.now();
+    const responseTimeMs = endTime - startTime;
+    if (response.status !== 200) {
+      return {
+        ok: false,
+        statusCode: response.status,
+        responseTimeMs,
+      };
+    }
+    return {
+      ok: true,
+      responseTimeMs,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+    };
+  }
+}
+
+if (REGULAR_RUN) {
+  // start cron job to run the test every 5 minutes
+  new CronJob(`0 */${TEST_INTERVAL_MIN} * * * *`, runTest, null, true);
+  console.log(
+    `Started cron job to run the test every ${TEST_INTERVAL_MIN} minutes`
+  );
+} else {
+  await runTest();
+}

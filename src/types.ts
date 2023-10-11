@@ -8,23 +8,25 @@ export type OperatorAvailabilityResult = {
   distributionBucketId: string;
   workerId: number;
   nodeEndpoint: string;
+  distributingStatus: "distributing" | "not-distributing";
 } & (
   | {
-      status: "ok";
+      pingStatus: "ok" | "asset-download-failed";
+      assetDownloadStatusCode?: number;
+      assetDownloadResponseTimeMs?: number;
       nodeStatus: DistributionOperatorStatus;
       opereatorMetadata: Operator["metadata"];
       chainHeadDiff?: number;
       blocksProcessedDiff?: number;
     }
   | {
-      status: "degraded";
+      pingStatus: "degraded";
       nodeStatus: DistributionOperatorStatus;
       opereatorMetadata: Operator["metadata"];
       refChainHead: number;
       refBlocksProcessed: number;
     }
-  | { status: "not-distributing" }
-  | { status: "dead"; error: string }
+  | { pingStatus: "dead"; error: string }
 );
 
 export type DistributionOperatorQueryNodeStatus = {
@@ -42,4 +44,10 @@ export type DistributionOperatorStatus = {
   uptime: number;
   downloadsInProgress: number;
   queryNodeStatus: DistributionOperatorQueryNodeStatus;
+};
+
+export type SampleAssetTestResult = {
+  ok: boolean;
+  statusCode?: number;
+  responseTimeMs?: number;
 };
