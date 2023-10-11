@@ -8,6 +8,7 @@ export type OperatorAvailabilityResult = {
   distributionBucketId: string;
   workerId: number;
   nodeEndpoint: string;
+  statusEndpoint: string;
   distributingStatus: "distributing" | "not-distributing";
 } & (
   | {

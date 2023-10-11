@@ -74,6 +74,7 @@ async function getOperatorStatus(
     distributionBucketId: operator.distributionBucket.id,
     workerId: operator.workerId,
     nodeEndpoint: operator?.metadata?.nodeEndpoint ?? "",
+    statusEndpoint: `${operator?.metadata?.nodeEndpoint}api/v1/status`,
     distributingStatus,
   };
 
@@ -209,6 +210,7 @@ async function getSampleAssetFromDistributor(
         },
       }
     );
+    await response.blob(); // get the fully body
     const endTime = performance.now();
     const responseTimeMs = endTime - startTime;
     if (response.status !== 200) {
