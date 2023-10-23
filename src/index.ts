@@ -7,7 +7,13 @@ import {
   OperatorAvailabilityResult,
   SampleAssetTestResult,
 } from "./types.js";
-import { GRAPHQL_URL, TEST_INTERVAL_MIN, getEsClient } from "./config.js";
+import {
+  GRAPHQL_URL,
+  SINGLE_RUN,
+  SOURCE_ID,
+  TEST_INTERVAL_MIN,
+  getEsClient,
+} from "./config.js";
 import { CronJob } from "cron";
 import fs from "node:fs/promises";
 import { Client } from "@elastic/elasticsearch";
@@ -18,10 +24,9 @@ const packageJson = JSON.parse(
 const packageVersion = packageJson.version;
 const userAgent = `dwg-ping/${packageVersion}`;
 const TEST_ASSET_ID = "1343";
-const REGULAR_RUN = true;
 
 let esClient: Client | null = null;
-if (REGULAR_RUN) {
+if (!SINGLE_RUN) {
   esClient = await getEsClient();
   if (!esClient) {
     process.exit(1);
@@ -50,7 +55,7 @@ async function runTest() {
       operators.map((operator) => getOperatorStatus(operator))
     );
     const resultsWithDegradations = await findOperatorDegradations(results);
-    if (REGULAR_RUN) {
+    if (!SINGLE_RUN) {
       await sendResults(resultsWithDegradations);
     }
 
@@ -70,6 +75,8 @@ async function getOperatorStatus(
       : "not-distributing";
   const commonFields = {
     time: new Date(),
+    source: SOURCE_ID,
+    version: packageVersion,
     operatorId: operator.id,
     distributionBucketId: operator.distributionBucket.id,
     workerId: operator.workerId,
@@ -231,7 +238,7 @@ async function getSampleAssetFromDistributor(
   }
 }
 
-if (REGULAR_RUN) {
+if (!SINGLE_RUN) {
   // start cron job to run the test every 5 minutes
   new CronJob(`0 */${TEST_INTERVAL_MIN} * * * *`, runTest, null, true);
   console.log(

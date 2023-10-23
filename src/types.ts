@@ -10,6 +10,8 @@ export type OperatorAvailabilityResult = {
   nodeEndpoint: string;
   statusEndpoint: string;
   distributingStatus: "distributing" | "not-distributing";
+  source: string;
+  version: string;
 } & (
   | {
       pingStatus: "ok" | "asset-download-failed";
