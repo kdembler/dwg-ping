@@ -5,6 +5,6 @@ services:
     image: dwg-ping
     environment:
       - ELASTICSEARCH_URL=https://monitoring.joyutils.org/elastic
-      - ELASTICSEARCH_USERNAME=monitoring
+      - ELASTICSEARCH_USERNAME=metrics
       - ELASTICSEARCH_PASSWORD=
       - TEST_INTERVAL_MIN=5
