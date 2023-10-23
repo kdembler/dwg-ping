@@ -16,13 +16,14 @@ export { SOURCE_ID };
 
 export const SINGLE_RUN = process.env.SINGLE_RUN === "true";
 
-class MTransport extends Transport {
-  // @ts-ignore
-  async request(params: any, options: any) {
-    params.path = "/elastic" + params.path; // <- append the path right here
-    return super.request(params, options);
-  }
-}
+const createTransport = (prefix: string) =>
+  class MTransport extends Transport {
+    // @ts-ignore
+    async request(params: any, options: any) {
+      params.path = prefix + params.path;
+      return super.request(params, options);
+    }
+  };
 export async function getEsClient() {
   const { ELASTICSEARCH_URL, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD } =
     process.env;
@@ -38,10 +39,11 @@ export async function getEsClient() {
     console.error("ELASTICSEARCH_PASSWORD not set");
     return null;
   }
+  const url = new URL(ELASTICSEARCH_URL);
   const esClient = new Client({
-    node: ELASTICSEARCH_URL,
+    node: url.origin,
     // @ts-ignore
-    Transport: MTransport,
+    Transport: createTransport(url.pathname),
     auth: {
       username: ELASTICSEARCH_USERNAME,
       password: ELASTICSEARCH_PASSWORD,
