@@ -1,0 +1,10 @@
+version: "3.7"
+
+services:
+  dwg-ping:
+    image: dwg-ping
+    environment:
+      - ELASTICSEARCH_URL=https://monitoring.joyutils.org/elastic
+      - ELASTICSEARCH_USERNAME=monitoring
+      - ELASTICSEARCH_PASSWORD=
+      - TEST_INTERVAL_MIN=5
