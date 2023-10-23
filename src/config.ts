@@ -1,4 +1,4 @@
-import { Client } from "@elastic/elasticsearch";
+import { Client, Transport } from "@elastic/elasticsearch";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,24 +16,35 @@ export { SOURCE_ID };
 
 export const SINGLE_RUN = process.env.SINGLE_RUN === "true";
 
+class MTransport extends Transport {
+  // @ts-ignore
+  async request(params: any, options: any) {
+    params.path = "/elastic" + params.path; // <- append the path right here
+    return super.request(params, options);
+  }
+}
 export async function getEsClient() {
-  if (!process.env.ELASTICSEARCH_URL) {
+  const { ELASTICSEARCH_URL, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD } =
+    process.env;
+  if (!ELASTICSEARCH_URL) {
     console.error("ELASTICSEARCH_URL not set");
     return null;
   }
-  if (!process.env.ELASTICSEARCH_USERNAME) {
+  if (!ELASTICSEARCH_USERNAME) {
     console.error("ELASTICSEARCH_USERNAME not set");
     return null;
   }
-  if (!process.env.ELASTICSEARCH_PASSWORD) {
+  if (!ELASTICSEARCH_PASSWORD) {
     console.error("ELASTICSEARCH_PASSWORD not set");
     return null;
   }
   const esClient = new Client({
-    node: process.env.ELASTICSEARCH_URL,
+    node: ELASTICSEARCH_URL,
+    // @ts-ignore
+    Transport: MTransport,
     auth: {
-      username: process.env.ELASTICSEARCH_USERNAME,
-      password: process.env.ELASTICSEARCH_PASSWORD,
+      username: ELASTICSEARCH_USERNAME,
+      password: ELASTICSEARCH_PASSWORD,
     },
   });
   try {
