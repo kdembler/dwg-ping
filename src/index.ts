@@ -246,8 +246,8 @@ async function getSampleAssetFromDistributor(
   }
 }
 
+console.log(`Starting dwg-ping v${packageVersion}`);
 if (!SINGLE_RUN) {
-  // start cron job to run the test every 5 minutes
   new CronJob(`0 */${TEST_INTERVAL_MIN} * * * *`, runTest, null, true);
   console.log(
     `Started cron job to run the test every ${TEST_INTERVAL_MIN} minutes`
