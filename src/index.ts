@@ -124,7 +124,11 @@ async function findOperatorDegradations(
 
   const medianBlocksProcessed = getMedian(
     operatorsResults
-      .filter((result) => result.pingStatus === "ok")
+      .filter(
+        (result) =>
+          result.pingStatus === "ok" &&
+          result.distributingStatus === "distributing"
+      )
       .map(
         (result) =>
           ((result as any).nodeStatus as DistributionOperatorStatus)
@@ -134,7 +138,11 @@ async function findOperatorDegradations(
 
   const medianChainHead = getMedian(
     operatorsResults
-      .filter((result) => result.pingStatus === "ok")
+      .filter(
+        (result) =>
+          result.pingStatus === "ok" &&
+          result.distributingStatus === "distributing"
+      )
       .map(
         (result) =>
           ((result as any).nodeStatus as DistributionOperatorStatus)

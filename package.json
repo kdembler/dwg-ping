@@ -1,6 +1,6 @@
 {
   "name": "@joystream/dwg-ping",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Monitor Joystream Operators",
   "license": "ISC",
   "type": "module",
